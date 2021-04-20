@@ -8,6 +8,10 @@ from dataclasses import dataclass
 from math import ceil
 from modules.utils import project_path
 from modules.artifacts import SOMConfigurations
+from pyFTS.models.multivariate.variable import Variable
+from pyFTS.partitioners.Grid import GridPartitioner
+from pyFTS.models.multivariate.wmvfts import WeightedMVFTS
+from pyFTS.benchmarks import Measures
 
 
 def reduce_data_by_som(
@@ -89,6 +93,84 @@ def pipeline(
         # print(reduced_df.head())
 
 
+def create_and_train_models(
+        grids: List[int],
+        som_config: SOMConfigurations,
+        train_percentage: float = 0.75,
+        partitions: Tuple[int, int, int] = (50, 50, 50),
+        reductions_folder: str = project_path('data/som_reductions'),
+        models_folder: str = project_path('data/fts_models')
+) -> NoReturn:
+    for gd in grids:
+        head_message = "=" * 100
+        head_message += f"Params:\n\tGrid: {(gd, gd)}\n\tEpochs: {som_config.epochs}\n\tpartitions: {partitions}\n"
+        start_time = datetime.now()
+        head_message += f"\n{start_time} -- START"
+
+        print(head_message)
+
+        filename = f"reduction_{gd}_{som_config.epochs}_epochs.csv"
+        data = pd.read_csv(f"{reductions_folder}/{filename}")
+
+        x = Variable(
+            "x",
+            data_label="x",
+            partitioner=GridPartitioner,
+            npart=partitions[0],
+            data=data
+        )
+
+        y = Variable(
+            "y",
+            data_label="y",
+            partitioner=GridPartitioner,
+            npart=partitions[1],
+            data=data
+        )
+
+        z = Variable(
+            name=som_config.endogen_variable,
+            data_label=som_config.endogen_variable,
+            partitioner=GridPartitioner,
+            npart=partitions[2],
+            data=data
+        )
+
+        model = WeightedMVFTS(
+            explanatory_variables=[x, y, z],
+            target_variable=z
+        )
+
+        train_limit = ceil(len(data) * train_percentage)
+
+        train = data[:train_limit]
+        test = data[train_limit:]
+        print(f"Train interval: {(0, train_limit)}")
+        print(f"Test interval: {(train_limit, len(data))}\n")
+
+        model.fit(ndata=train, dump="time")
+
+        filename = f"model_{gd}_train_with_{round(train_percentage*100)}_percent.model"
+        filepath = f"{models_folder}/{filename}"
+
+        persist_obj(model, filepath)
+
+        rmse, mape, u = Measures.get_point_statistics(
+            data=test,
+            model=model
+        )
+
+        finish = datetime.now()
+        finish_message = f"\nFinish Training -- {finish - start_time} to train FTS model"
+        finish_message += f"\n\tRMSE: {rmse}\n\tMAPE: {mape}\n\tU: {u}"
+
+        print(finish_message)
+
+        report_name = project_path(f"data/reports/report_FTS_{gd}_SOM.txt")
+        with open(report_name, 'w') as report:
+            report.write(head_message + finish_message)
+
+
 if __name__=="__main__":
     filename = project_path('data/energydata_complete.csv')
     data = pd.read_csv(filename)
@@ -98,8 +180,13 @@ if __name__=="__main__":
         epochs=10000,
         ignore=['date']
     )
-    pipeline(
+    # pipeline(
+    #     grids=[25, 35, 50, 100],
+    #     som_config=som_config,
+    #     partitions=(2, 2, 2)
+    # )
+
+    create_and_train_models(
         grids=[25, 35, 50, 100],
         som_config=som_config,
-        partitions=(2, 2, 2)
     )
