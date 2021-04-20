@@ -7,7 +7,7 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setup(
-    name="Appliance-Energy-Prediction",
+    name="Appliance_Energy_Prediction",
     version="1.0",
     author="MATHEUS CASCALHO",
     author_email="cascalhom@gmail.com",
