@@ -24,5 +24,5 @@ def project_path(filepath: str = '') -> str:
         if PROJECT_NAME not in base:
             path = input('Project not found. Please, type the file location: ')
 
-    path += filepath
+    path = os.path.join(path, filepath)
     return path

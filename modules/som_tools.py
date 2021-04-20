@@ -1,9 +1,13 @@
 import pandas as pd
-from typing import List
+from typing import List, NoReturn, Tuple
 from pyFTS.common.Util import persist_obj, load_obj
 from pyFTS.common.transformations.som import SOMTransformation
+import time
+from datetime import datetime
+from dataclasses import dataclass
 from math import ceil
 from modules.utils import project_path
+from modules.artifacts import SOMConfigurations
 
 
 def reduce_data_by_som(
@@ -38,3 +42,54 @@ def create_som_transformator(
     print(f"Som transformator saved as {filename}")
     return som
 
+
+def pipeline(
+        grids: List[int],
+        som_config: SOMConfigurations,
+        partitions: Tuple[int, int, int] = (50, 50, 50)
+) -> NoReturn:
+    start_time = time.time()
+    head_message = "="*100
+    for gd in grids:
+        head_message += f"Params:\n\tGrid: {(gd, gd)}\n\tEpochs: {som_config.epochs}\n\tpartitions: {partitions}"
+        head_message += f"\n{datetime.now()} -- START"
+
+        print(head_message)
+
+        transformator_file = project_path(f'data/som_transformators/transformator_{gd}_{som_config.epochs}_epochs.som')
+
+        transformator = create_som_transformator(
+            data=som_config.data,
+            grid_dimension=gd,
+            endogen_variable=som_config.endogen_variable,
+            ignore=som_config.ignore,
+            epochs=som_config.epochs,
+            train_percentage=0.75,
+            filename=transformator_file
+        )
+
+        reduction_file = project_path(f'data/som_reductions/reduction_{gd}_{som_config.epochs}_epochs.csv')
+        reduced_df = reduce_data_by_som(
+            df=som_config.data,
+            ignore=som_config.ignore,
+            som_transformator=transformator,
+            endogen_variable=som_config.endogen_variable,
+            reduction_file=reduction_file
+        )
+        print(reduced_df.head())
+
+
+if __name__=="__main__":
+    filename = project_path('data/energydata_complete.csv')
+    data = pd.read_csv(filename)
+    som_config = SOMConfigurations(
+        data=data,
+        endogen_variable='Appliances',
+        epochs=1,
+        ignore=['date']
+    )
+    pipeline(
+        grids=[2],
+        som_config=som_config,
+        partitions=(2, 2, 2)
+    )
