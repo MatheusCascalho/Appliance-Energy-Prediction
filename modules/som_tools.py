@@ -95,11 +95,11 @@ if __name__=="__main__":
     som_config = SOMConfigurations(
         data=data,
         endogen_variable='Appliances',
-        epochs=1,
+        epochs=10000,
         ignore=['date']
     )
     pipeline(
-        grids=[2, 3],
+        grids=[25, 35, 50, 100],
         som_config=som_config,
         partitions=(2, 2, 2)
     )
