@@ -39,7 +39,7 @@ def create_som_transformator(
     df = data[cols]
     som.train(data=df, epochs=epochs, percentage_train=train_percentage)
     persist_obj(som, filename)
-    print(f"Som transformator saved as {filename}")
+    print(f"\nSom transformator saved as {filename}\n")
     return som
 
 
@@ -48,11 +48,11 @@ def pipeline(
         som_config: SOMConfigurations,
         partitions: Tuple[int, int, int] = (50, 50, 50)
 ) -> NoReturn:
-    start_time = time.time()
-    head_message = "="*100
     for gd in grids:
+        head_message = "=" * 100
         head_message += f"Params:\n\tGrid: {(gd, gd)}\n\tEpochs: {som_config.epochs}\n\tpartitions: {partitions}"
-        head_message += f"\n{datetime.now()} -- START"
+        start_time = datetime.now()
+        head_message += f"\n{start_time} -- START"
 
         print(head_message)
 
@@ -67,6 +67,8 @@ def pipeline(
             train_percentage=0.75,
             filename=transformator_file
         )
+        training_time = datetime.now()
+        head_message += f"\n{training_time} -- finish training -- {training_time - start_time} to train"
 
         reduction_file = project_path(f'data/som_reductions/reduction_{gd}_{som_config.epochs}_epochs.csv')
         reduced_df = reduce_data_by_som(
@@ -76,7 +78,15 @@ def pipeline(
             endogen_variable=som_config.endogen_variable,
             reduction_file=reduction_file
         )
-        print(reduced_df.head())
+
+        projection_time = datetime.now()
+        head_message += f"\n{projection_time} -- finish projection -- {projection_time - training_time} to project"
+
+        report_file = project_path(f'data/reports/report_{gd}_{som_config.epochs}_epochs.txt')
+        with open(report_file, 'w') as rep:
+            rep.write(head_message)
+        head_message = ''
+        # print(reduced_df.head())
 
 
 if __name__=="__main__":
@@ -89,7 +99,7 @@ if __name__=="__main__":
         ignore=['date']
     )
     pipeline(
-        grids=[2],
+        grids=[2, 3],
         som_config=som_config,
         partitions=(2, 2, 2)
     )
