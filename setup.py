@@ -19,7 +19,7 @@ setup(
     long_description=long_description,
     install_requires=required,
     long_description_content_type="text/markdown",
-    packages=setuptools.find_packages(),
+    packages=setuptools.find_packages(include=['Appliance_Energy_Prediction']),
     include_package_data=True,
     description="Appliance Energy Prediction"
 )
