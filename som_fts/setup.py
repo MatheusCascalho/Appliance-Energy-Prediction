@@ -12,14 +12,14 @@ with open('requirements.txt') as f:
 
 
 setup(
-    name="Appliance_Energy_Prediction",
+    name="som_fts",
     version="1.0",
     author="MATHEUS CASCALHO",
     author_email="cascalhom@gmail.com",
     long_description=long_description,
     install_requires=required,
     long_description_content_type="text/markdown",
-    packages=setuptools.find_packages(include=['Appliance_Energy_Prediction']),
+    packages=setuptools.find_packages(include=['som_fts']),
     include_package_data=True,
-    description="Appliance Energy Prediction"
+    description="SOM FTS TOOLS"
 )

@@ -1,13 +1,10 @@
 import pandas as pd
 from typing import List, NoReturn, Tuple, Callable
-from pyFTS.common.Util import persist_obj, load_obj
+from pyFTS.common.Util import persist_obj
 from pyFTS.common.transformations.som import SOMTransformation
-import time
 from datetime import datetime
-from dataclasses import dataclass
-from math import ceil
-from modules.utils import project_path
-from modules.artifacts import SOMConfigurations
+from som_fts.modules.utils import project_path
+from som_fts.modules.artifacts import SOMConfigurations
 from pyFTS.models.multivariate.variable import Variable
 from pyFTS.partitioners.Grid import GridPartitioner
 from pyFTS.models.multivariate.wmvfts import WeightedMVFTS

@@ -3,7 +3,7 @@ import os
 
 def project_path(filepath: str = '') -> str:
     base = os.getcwd()
-    PROJECT_NAME = 'Appliance_Energy_Prediction'
+    PROJECT_NAME = 'Appliance-Energy-Prediction'
     if PROJECT_NAME in base:
         i = base.index(PROJECT_NAME)
         base = base[:i]
