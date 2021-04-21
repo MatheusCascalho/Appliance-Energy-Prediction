@@ -1,5 +1,5 @@
 import pandas as pd
-from typing import List, NoReturn, Tuple
+from typing import List, NoReturn, Tuple, Callable
 from pyFTS.common.Util import persist_obj, load_obj
 from pyFTS.common.transformations.som import SOMTransformation
 import time
@@ -93,13 +93,14 @@ def pipeline(
         # print(reduced_df.head())
 
 
-def create_and_train_models(
+def create_and_train_models_with_train_test_split(
         grids: List[int],
         som_config: SOMConfigurations,
-        train_percentage: float = 0.75,
+        spliter: Callable,
         partitions: Tuple[int, int, int] = (50, 50, 50),
         reductions_folder: str = project_path('data/som_reductions'),
-        models_folder: str = project_path('data/fts_models')
+        models_folder: str = project_path('data/fts_models'),
+
 ) -> NoReturn:
     for gd in grids:
         head_message = "=" * 100
@@ -141,16 +142,16 @@ def create_and_train_models(
             target_variable=z
         )
 
-        train_limit = ceil(len(data) * train_percentage)
+        # train_limit = ceil(len(data) * train_percentage)
 
-        train = data[:train_limit]
-        test = data[train_limit:]
-        print(f"Train interval: {(0, train_limit)}")
-        print(f"Test interval: {(train_limit, len(data))}\n")
+        train, test = spliter(data)
+
+        print(f"Train length: {len(train)}")
+        print(f"Test length: {len(test)}\n")
 
         model.fit(ndata=train, dump="time")
-
-        filename = f"model_{gd}_train_with_{round(train_percentage*100)}_percent.model"
+        train_percentage = round(100 * len(train) / len(data))
+        filename = f"model_{gd}_train_with_{train_percentage}_percent_{partitions[0]}_partitions.model"
         filepath = f"{models_folder}/{filename}"
 
         persist_obj(model, filepath)
@@ -166,7 +167,9 @@ def create_and_train_models(
 
         print(finish_message)
 
-        report_name = project_path(f"data/reports/report_FTS_{gd}_SOM.txt")
+        report_name = project_path(
+            f"data/reports/report_FTS_{gd}_SOM_with_{train_percentage}_percent_percent_{partitions[0]}_partitions.txt"
+        )
         with open(report_name, 'w') as report:
             report.write(head_message + finish_message)
 
@@ -186,7 +189,9 @@ if __name__=="__main__":
     #     partitions=(2, 2, 2)
     # )
 
-    create_and_train_models(
+    create_and_train_models_with_train_test_split(
         grids=[25, 35, 50, 100],
         som_config=som_config,
+        spliter=lambda x: (x[:round(len(x)*0.75)], x[round(len(x)*0.75):]),
+        partitions=(50, 50, 50)
     )
