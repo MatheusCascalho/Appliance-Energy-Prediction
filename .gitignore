@@ -518,3 +518,4 @@ FodyWeavers.xsd
 *.tlog
 
 # End of https://www.toptal.com/developers/gitignore/api/jupyternotebooks,libreoffice,microsoftoffice,pycharm,visualstudio,vscode
+/Appliance_Energy_Prediction.egg-info/
