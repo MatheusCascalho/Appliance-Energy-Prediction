@@ -100,7 +100,7 @@ def create_and_train_models_with_train_test_split(
         partitions: Tuple[int, int, int] = (50, 50, 50),
         reductions_folder: str = project_path('data/som_reductions'),
         models_folder: str = project_path('data/fts_models'),
-
+        prefix: str = ""
 ) -> NoReturn:
     for gd in grids:
         head_message = "=" * 100
@@ -151,7 +151,7 @@ def create_and_train_models_with_train_test_split(
 
         model.fit(ndata=train, dump="time")
         train_percentage = round(100 * len(train) / len(data))
-        filename = f"model_{gd}_train_with_{train_percentage}_percent_{partitions[0]}_partitions.model"
+        filename = f"{prefix}_model_{gd}_train_with_{train_percentage}_percent_{partitions[0]}_partitions.model"
         filepath = f"{models_folder}/{filename}"
 
         persist_obj(model, filepath)
@@ -168,7 +168,7 @@ def create_and_train_models_with_train_test_split(
         print(finish_message)
 
         report_name = project_path(
-            f"data/reports/report_FTS_{gd}_SOM_with_{train_percentage}_percent_percent_{partitions[0]}_partitions.txt"
+            f"data/reports/{prefix}_report_FTS_{gd}_SOM_with_{train_percentage}_percent_percent_{partitions[0]}_partitions.txt"
         )
         with open(report_name, 'w') as report:
             report.write(head_message + finish_message)
@@ -192,6 +192,7 @@ if __name__=="__main__":
     create_and_train_models_with_train_test_split(
         grids=[25, 35, 50, 100],
         som_config=som_config,
-        spliter=lambda x: (x[:round(len(x)*0.75)], x[round(len(x)*0.75):]),
-        partitions=(50, 50, 50)
+        spliter=lambda x: (x[:round(len(x)*0.75)], x[:round(len(x)*0.75)]),
+        partitions=(50, 50, 50),
+        prefix="forecast_TRAIN"
     )
