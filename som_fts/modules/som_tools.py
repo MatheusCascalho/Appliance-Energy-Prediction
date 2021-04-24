@@ -21,7 +21,7 @@ def reduce_data_by_som(
     cols = [col for col in df.columns if col not in ignore]
     to_reduce = df[cols]
     reduced = som_transformator.apply(data=to_reduce, endogen_variable=endogen_variable)
-    reduced.to_csv(reduction_file)
+    reduced.to_csv(reduction_file, index=False)
     return reduced
 
 
@@ -47,7 +47,8 @@ def create_som_transformator(
 def pipeline(
         grids: List[int],
         som_config: SOMConfigurations,
-        partitions: Tuple[int, int, int] = (50, 50, 50)
+        partitions: Tuple[int, int, int] = (50, 50, 50),
+        prefix: str = ""
 ) -> NoReturn:
     for gd in grids:
         head_message = "=" * 100
@@ -57,7 +58,7 @@ def pipeline(
 
         print(head_message)
 
-        transformator_file = project_path(f'data/som_transformators/transformator_{gd}_{som_config.epochs}_epochs.som')
+        transformator_file = project_path(f'data/som_transformators/{prefix}transformator_{gd}_{som_config.epochs}_epochs.som')
 
         transformator = create_som_transformator(
             data=som_config.data,
@@ -71,7 +72,7 @@ def pipeline(
         training_time = datetime.now()
         head_message += f"\n{training_time} -- finish training -- {training_time - start_time} to train"
 
-        reduction_file = project_path(f'data/som_reductions/reduction_{gd}_{som_config.epochs}_epochs.csv')
+        reduction_file = project_path(f'data/som_reductions/{prefix}reduction_{gd}_{som_config.epochs}_epochs.csv')
         reduced_df = reduce_data_by_som(
             df=som_config.data,
             ignore=som_config.ignore,
@@ -83,7 +84,7 @@ def pipeline(
         projection_time = datetime.now()
         head_message += f"\n{projection_time} -- finish projection -- {projection_time - training_time} to project"
 
-        report_file = project_path(f'data/reports/report_{gd}_{som_config.epochs}_epochs.txt')
+        report_file = project_path(f'data/reports/{prefix}report_{gd}_{som_config.epochs}_epochs.txt')
         with open(report_file, 'w') as rep:
             rep.write(head_message)
         head_message = ''
@@ -107,7 +108,7 @@ def create_and_train_models_with_train_test_split(
 
         print(head_message)
 
-        filename = f"reduction_{gd}_{som_config.epochs}_epochs.csv"
+        filename = f"{prefix}reduction_{gd}_{som_config.epochs}_epochs.csv"
         data = pd.read_csv(f"{reductions_folder}/{filename}")
 
         x = Variable(
@@ -172,24 +173,34 @@ def create_and_train_models_with_train_test_split(
 
 
 if __name__=="__main__":
+    from sklearn.preprocessing import MinMaxScaler
+
     filename = project_path('data/energydata_complete.csv')
     data = pd.read_csv(filename)
+    data.pop('date')
+    scaled = MinMaxScaler()
+    scaled_data = scaled.fit_transform(data)
+    scaled_data = pd.DataFrame(columns=data.columns, data=scaled_data)
+
     som_config = SOMConfigurations(
-        data=data,
+        data=scaled_data,
         endogen_variable='Appliances',
         epochs=10000,
         ignore=['date']
     )
-    # pipeline(
-    #     grids=[25, 35, 50, 100],
-    #     som_config=som_config,
-    #     partitions=(2, 2, 2)
-    # )
+    pipeline(
+        grids=[25, 35, 50, 100],
+        som_config=som_config,
+        partitions=(50, 50, 50),
+        prefix="SCALED_"
+    )
+
+    print("=-="*50)
 
     create_and_train_models_with_train_test_split(
         grids=[25, 35, 50, 100],
         som_config=som_config,
-        spliter=lambda x: (x[:round(len(x)*0.75)], x[:round(len(x)*0.75)]),
+        spliter=lambda x: (x[:round(len(x)*0.75)], x[round(len(x)*0.75):]),
         partitions=(50, 50, 50),
-        prefix="forecast_TRAIN"
+        prefix="SCALED_"
     )
