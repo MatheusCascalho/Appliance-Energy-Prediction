@@ -3,8 +3,8 @@
 	Epochs: 10000
 	partitions: (50, 50, 50)
 
-2021-04-24 01:32:19.632694 -- START
-Finish Training -- 0:00:22.603538 to train FTS model
-	RMSE: 0.06
-	MAPE: 34.54
+2021-04-24 23:35:21.614112 -- START
+Finish Training -- 0:00:27.759745 to train FTS model
+	RMSE: 65.64
+	MAPE: 28.19
 	U: 1.02

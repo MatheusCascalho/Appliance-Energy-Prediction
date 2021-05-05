@@ -110,6 +110,7 @@ def create_and_train_models_with_train_test_split(
 
         filename = f"{prefix}reduction_{gd}_{som_config.epochs}_epochs.csv"
         data = pd.read_csv(f"{reductions_folder}/{filename}")
+        data[som_config.endogen_variable] = som_config.data[som_config.endogen_variable]
 
         x = Variable(
             "x",
@@ -181,19 +182,20 @@ if __name__=="__main__":
     scaled = MinMaxScaler()
     scaled_data = scaled.fit_transform(data)
     scaled_data = pd.DataFrame(columns=data.columns, data=scaled_data)
+    scaled_data['Appliances'] = data['Appliances']
 
     som_config = SOMConfigurations(
-        data=scaled_data,
+        data=data,
         endogen_variable='Appliances',
         epochs=10000,
         ignore=['date']
     )
-    pipeline(
-        grids=[25, 35, 50, 100],
-        som_config=som_config,
-        partitions=(50, 50, 50),
-        prefix="SCALED_"
-    )
+    # pipeline(
+    #     grids=[25, 35, 50, 100],
+    #     som_config=som_config,
+    #     partitions=(50, 50, 50),
+    #     prefix="SCALED_"
+    # )
 
     print("=-="*50)
 
@@ -201,6 +203,6 @@ if __name__=="__main__":
         grids=[25, 35, 50, 100],
         som_config=som_config,
         spliter=lambda x: (x[:round(len(x)*0.75)], x[round(len(x)*0.75):]),
-        partitions=(50, 50, 50),
+        partitions=(25, 25, 25),
         prefix="SCALED_"
     )
