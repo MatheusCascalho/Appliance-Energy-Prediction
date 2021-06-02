@@ -58,7 +58,7 @@ def pipeline(
 
         print(head_message)
 
-        transformator_file = project_path(f'data/som_transformators/{prefix}transformator_{gd}_{som_config.epochs}_epochs.som')
+        transformator_file = project_path(f'data/som_transformators/cross_validation/{prefix}transformator_{gd}_{som_config.epochs}_epochs.som')
 
         transformator = create_som_transformator(
             data=som_config.data,
@@ -72,7 +72,7 @@ def pipeline(
         training_time = datetime.now()
         head_message += f"\n{training_time} -- finish training -- {training_time - start_time} to train"
 
-        reduction_file = project_path(f'data/som_reductions/{prefix}reduction_{gd}_{som_config.epochs}_epochs.csv')
+        reduction_file = project_path(f'data/som_reductions_validations/{prefix}reduction_{gd}_{som_config.epochs}_epochs.csv')
         reduced_df = reduce_data_by_som(
             df=som_config.data,
             ignore=som_config.ignore,
@@ -96,7 +96,7 @@ def create_and_train_models_with_train_test_split(
         som_config: SOMConfigurations,
         spliter: Callable,
         partitions: Tuple[int, int, int] = (50, 50, 50),
-        reductions_folder: str = project_path('data/som_reductions'),
+        reductions_folder: str = project_path('data/som_reductions_validations'),
         models_folder: str = project_path('data/fts_models'),
         prefix: str = ""
 ) -> NoReturn:
@@ -174,35 +174,40 @@ def create_and_train_models_with_train_test_split(
 
 
 if __name__=="__main__":
-    from sklearn.preprocessing import MinMaxScaler
+    # from sklearn.preprocessing import MinMaxScaler
 
     filename = project_path('data/energydata_complete.csv')
     data = pd.read_csv(filename)
     data.pop('date')
-    scaled = MinMaxScaler()
-    scaled_data = scaled.fit_transform(data)
-    scaled_data = pd.DataFrame(columns=data.columns, data=scaled_data)
-    scaled_data['Appliances'] = data['Appliances']
 
     som_config = SOMConfigurations(
         data=data,
         endogen_variable='Appliances',
-        epochs=10000,
+        epochs=20,
         ignore=['date']
     )
-    # pipeline(
-    #     grids=[25, 35, 50, 100],
-    #     som_config=som_config,
-    #     partitions=(50, 50, 50),
-    #     prefix="SCALED_"
-    # )
+    window = round(len(data) / 10)
+    step = round(len(data) / 20)
+    last_step = 0
 
-    print("=-="*50)
+    for current_step in range(20):
+        limit = last_step + window
+        som_config.data = data.iloc[last_step:limit]
+        for i in range(5):
+            pipeline(
+                grids=[25, 35, 50, 100],
+                som_config=som_config,
+                partitions=(20, 20, 20),
+                prefix=f"st{current_step}_exp{i}_"
+            )
+            print("=-="*50)
 
-    create_and_train_models_with_train_test_split(
-        grids=[25, 35, 50, 100],
-        som_config=som_config,
-        spliter=lambda x: (x[:round(len(x)*0.75)], x[round(len(x)*0.75):]),
-        partitions=(25, 25, 25),
-        prefix="SCALED_"
-    )
+            create_and_train_models_with_train_test_split(
+                grids=[25, 35, 50, 100],
+                som_config=som_config,
+                spliter=lambda x: (x[:round(len(x)*0.75)], x[round(len(x)*0.75):]),
+                partitions=(25, 25, 25),
+                prefix=f"st{current_step}_exp{i}_"
+            )
+
+        last_step += step
