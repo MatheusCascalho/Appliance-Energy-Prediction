@@ -20,7 +20,7 @@ class PcaWeightedMVFTS():
         return self.model, pca_reduced
 
     def run_test_model(self,model,data):
-        pca_reduced = self.create_wmvfts(data)
+        pca_reduced = self.apply_pca(data)
         forecast, forecast_self = self.forecast_wmvfts(model,pca_reduced)
         return forecast, forecast_self, pca_reduced
 
@@ -78,8 +78,8 @@ class PcaWeightedMVFTS():
         self.model.fit(data)
 
     def forecast_wmvfts(self,model,data):
-        result = model.forecast(data)
-        result_self = self.model.forecast(data)
+        result = model.predict(data)
+        result_self = self.model.predict(data)
         return result, result_self
 
 
