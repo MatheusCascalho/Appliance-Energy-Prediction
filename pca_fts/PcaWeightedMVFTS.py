@@ -37,30 +37,20 @@ class PcaWeightedMVFTS():
         scaled_data = pd.DataFrame(columns=data.columns[:-1], data=scaled_data)
         scaled_data[target] = data[target].values
 
-        pca = PcaTransformation()
+        pca = PcaTransformation(n_components = self.n_components)
         pca_reduced = pca.apply(data=scaled_data, endogen_variable=self.endogen_variable)
         return (pca_reduced)
 
     def create_wmvfts(self,data):
         reduced = self.apply_pca(data)
 
-        x = Variable(
-            "x",
-            data_label="x",
-            partitioner=GridPartitioner,
-            npart=self.n_part,
-            data=reduced
-        )
+        exog = []
+        components = reduced.columns
 
-        y = Variable(
-            "y",
-            data_label="y",
-            partitioner=GridPartitioner,
-            npart=self.n_part,
-            data=reduced
-        )
+        for i in range(0,self.n_components):
+            exog.append(Variable("v"+str(i), data_label=components[i], partitioner=GridPartitioner, npart=self.n_part, data=reduced))
 
-        z = Variable(
+        endog = Variable(
             name=self.endogen_variable,
             data_label=self.endogen_variable,
             partitioner=GridPartitioner,
@@ -68,11 +58,29 @@ class PcaWeightedMVFTS():
             data=reduced
         )
 
+        exog.append(endog)
+
         self.model = WeightedMVFTS(
-            explanatory_variables=[x, y, z],
-            target_variable=z
+            explanatory_variables = exog,
+            target_variable = endog
         )
         return reduced
+
+        # x = Variable(
+        #     "x",
+        #     data_label="x",
+        #     partitioner=GridPartitioner,
+        #     npart=self.n_part,
+        #     data=reduced
+        # )
+        #
+        # y = Variable(
+        #     "y",
+        #     data_label="y",
+        #     partitioner=GridPartitioner,
+        #     npart=self.n_part,
+        #     data=reduced
+        # )
 
     def fit_wmvfts(self, data):
         self.model.fit(data)
