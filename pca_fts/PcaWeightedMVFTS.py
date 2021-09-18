@@ -7,7 +7,7 @@ from pyFTS.models.multivariate.wmvfts import WeightedMVFTS
 
 
 class PcaWeightedMVFTS():
-    def __init__(self, n_components, endogen_variable, n_part):
+    def __init__(self, n_components,endogen_variable, n_part):
 
         self.n_components = n_components;
         self.endogen_variable = endogen_variable;
@@ -66,28 +66,12 @@ class PcaWeightedMVFTS():
         )
         return reduced
 
-        # x = Variable(
-        #     "x",
-        #     data_label="x",
-        #     partitioner=GridPartitioner,
-        #     npart=self.n_part,
-        #     data=reduced
-        # )
-        #
-        # y = Variable(
-        #     "y",
-        #     data_label="y",
-        #     partitioner=GridPartitioner,
-        #     npart=self.n_part,
-        #     data=reduced
-        # )
-
     def fit_wmvfts(self, data):
         self.model.fit(data)
 
     def forecast_wmvfts(self,model,data):
-        result = model.predict(data)
-        result_self = self.model.predict(data)
+        result = model.predict(data,steps_ahead=1)
+        result_self = self.model.predict(data,steps_ahead=1)
         return result, result_self
 
 

@@ -21,6 +21,7 @@ class PcaTransformation(Transformation):
             endogen_variable = None
         cols = data.columns[:-1] if endogen_variable is None else [col for col in data.columns if
                                                                    col != endogen_variable]
+
         self.pca.fit(data[cols].values)
         transformed = self.pca.transform(data[cols])
         new = pd.DataFrame(transformed, columns=list(names))
