@@ -39,7 +39,7 @@ class PcaWeightedMVFTS():
 
         pca = PcaTransformation(n_components = self.n_components)
         pca_reduced = pca.apply(data=scaled_data, endogen_variable=self.endogen_variable)
-        return (pca_reduced)
+        return pca_reduced
 
     def create_wmvfts(self,data):
         reduced = self.apply_pca(data)
