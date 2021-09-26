@@ -36,15 +36,17 @@ class PcaSarimax():
         scaled_data = pd.DataFrame(columns=data.columns[:-1], data=scaled_data)
         scaled_data[target] = data[target].values
 
-        pca = PcaTransformation()
+        pca = PcaTransformation(n_components = self.n_components)
         pca_reduced = pca.apply(data=scaled_data, endogen_variable=self.endogen_variable)
         return (pca_reduced)
 
     def create_sarimax(self, data):
         reduced = self.apply_pca(data)
         exog = data.drop(labels=[self.endogen_variable], axis=1)
-        self.model = SARIMAX(endog = list(reduced[self.endogen_variable]),
-                        exog = exog,
+        endog = reduced.loc[:,self.endogen_variable]
+
+        self.model = SARIMAX(endog = endog.values,
+                        exog = exog.values,
                         order = self.order,
                         seasonal_order = self.seasonal_order,
                         enforce_invertibility=False,
