@@ -28,6 +28,8 @@ class AutoencoderTransformation(Transformation):
         self.decoder_layers = []
         self.input = None
         self.scaler = MinMaxScaler()
+        self.names = None
+        self.encoder=None
 
 
         # debug attributes
@@ -36,7 +38,15 @@ class AutoencoderTransformation(Transformation):
 
 
 
-
+    def apply_trained_ae(self,data, endogen):
+        
+        scaler = MinMaxScaler()
+        cols = data.columns[:-1] if endogen is None else [col for col in data.columns if
+                                                                   col != endogen]
+        data_scaled = scaler.fit_transform(data[cols])
+        new_data = pd.DataFrame(self.encoder.predict(data_scaled), columns = self.names)
+        
+        return new_data.join(data[endogen].reset_index())
 
 
 
@@ -116,7 +126,7 @@ class AutoencoderTransformation(Transformation):
         """
 
         endogen_variable = kwargs.get('endogen_variable', None)
-        names = kwargs.get('names', ('factor_1', 'factor_2'))
+        self.names = kwargs.get('names', ('factor_1', 'factor_2'))
 
         if endogen_variable not in data.columns:
             endogen_variable = None
@@ -129,10 +139,10 @@ class AutoencoderTransformation(Transformation):
                                                
         self.train(data_scaled, 1, epochs, n_layers, neuron_per_layer)
         
-        encoder = Model(inputs=self.input, outputs=self.encoder_layers[-1])
+        self.encoder = Model(inputs=self.input, outputs=self.encoder_layers[-1])
         
 
-        new_data = pd.DataFrame(encoder.predict(data_scaled), columns = names)
+        new_data = pd.DataFrame(self.encoder.predict(data_scaled), columns = self.names)
 
         endogen = endogen_variable if endogen_variable is not None else data.columns[-1]
         new_data[endogen] = data[endogen].values
