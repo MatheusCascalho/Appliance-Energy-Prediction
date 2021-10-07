@@ -14,6 +14,7 @@ class AEWeightedMVFTS():
         self.n_part = n_part
         self.model = None
         self.names = names
+        self.AE = AutoencoderTransformation(reduced_dimension = self.n_dimensions)
 
     def run_train_model(self,data=None, epochs=50, n_layers=2, neuron_per_layer = None, batch = 40,
                 opt = 'adam', act = 'tanh'):
@@ -23,7 +24,8 @@ class AEWeightedMVFTS():
 
     def run_test_model(self,model=None,data=None, epochs=50, n_layers=2, neuron_per_layer = None, batch = 40,
                 opt = 'adam', act = 'tanh'):
-        ae_reduced = self.apply_ae(data, epochs, n_layers, neuron_per_layer, batch, opt, act)
+        ae_reduced = self.AE.apply_trained_ae(data, self.endogen_variable)
+        #ae_reduced = self.apply_ae(data, epochs, n_layers, neuron_per_layer, batch, opt, act)
         forecast, forecast_self = self.forecast_wmvfts(model,ae_reduced)
         return forecast, forecast_self, ae_reduced
 
@@ -33,8 +35,7 @@ class AEWeightedMVFTS():
         target = self.endogen_variable
         if target not in data.columns:
             target = None
-        AE = AutoencoderTransformation(reduced_dimension = self.n_dimensions)
-        ae_reduced = AE.apply(data=data, epochs=epochs, n_layers=n_layers, neuron_per_layer=neuron_per_layer,
+        ae_reduced = self.AE.apply(data=data, epochs=epochs, n_layers=n_layers, neuron_per_layer=neuron_per_layer,
                               batch=batch, opt=opt, act=act, endogen_variable=self.endogen_variable, names=self.names)
         return ae_reduced
      
@@ -69,6 +70,7 @@ class AEWeightedMVFTS():
         self.model.fit(data)
 
     def forecast_wmvfts(self,model,data):
+
         result = model.predict(data,steps_ahead=1)
         result_self = self.model.predict(data,steps_ahead=1)
         return result, result_self
