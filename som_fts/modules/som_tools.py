@@ -1,6 +1,8 @@
+import sys
+sys.path.append('/home/matheus_cascalho/Documentos/matheus_cascalho/Appliance-Energy-Prediction')
 import pandas as pd
 from typing import List, NoReturn, Tuple, Callable
-from pyFTS.common.Util import persist_obj
+from pyFTS.common.Util import persist_obj, sliding_window
 from pyFTS.common.transformations.som import SOMTransformation
 from datetime import datetime
 from som_fts.modules.utils import project_path
@@ -9,6 +11,11 @@ from pyFTS.models.multivariate.variable import Variable
 from pyFTS.partitioners.Grid import GridPartitioner
 from pyFTS.models.multivariate.wmvfts import WeightedMVFTS
 from pyFTS.benchmarks import Measures
+import sys
+import traceback
+from collections import defaultdict
+from sklearn.metrics import mean_absolute_error
+
 
 
 def reduce_data_by_som(
@@ -31,6 +38,7 @@ def create_som_transformator(
         endogen_variable: str,
         ignore: List[str],
         epochs: int,
+        learning_rate: float,
         train_percentage: float = 0.75,
         filename: str = 'data/transformators/som_transformator.som'
 ) -> SOMTransformation:
@@ -38,176 +46,234 @@ def create_som_transformator(
     som = SOMTransformation(grid_dimension=gd)
     cols = [col for col in data.columns if col != endogen_variable and col not in ignore]
     df = data[cols]
-    som.train(data=df, epochs=epochs, percentage_train=train_percentage)
+    som.train(data=df, epochs=epochs, percentage_train=train_percentage, leaning_rate=learning_rate)
     persist_obj(som, filename)
     print(f"\nSom transformator saved as {filename}\n")
     return som
 
 
-def pipeline(
-        grids: List[int],
+def train_som_and_reduce_dataset_varying_grids(
+        grid: int,
         som_config: SOMConfigurations,
-        partitions: Tuple[int, int, int] = (50, 50, 50),
-        prefix: str = ""
+        interval: Tuple[int, int],
+        learning_rate: float,
+        prefix: str = "",
+        sufix: str = ""
 ) -> NoReturn:
-    for gd in grids:
-        head_message = "=" * 100
-        head_message += f"Params:\n\tGrid: {(gd, gd)}\n\tEpochs: {som_config.epochs}\n\tpartitions: {partitions}"
-        start_time = datetime.now()
-        head_message += f"\n{start_time} -- START"
+    head_message = "=" * 100
+    head_message += f"Params:\n\tGrid: {(grid, grid)}\n\tEpochs: {som_config.epochs}\n\tpartitions: {partitions}\n\tinterval: {interval}"
+    head_message += f"\n\tsufix: {sufix}"
+    start_time = datetime.now()
+    head_message += f"\n{start_time} -- START"
 
-        print(head_message)
+    print(head_message)
 
-        transformator_file = project_path(f'data/som_transformators/cross_validation/{prefix}transformator_{gd}_{som_config.epochs}_epochs.som')
+    transformator_file = project_path(f'data/som_transformators/cross_validation/{prefix}transformator_{grid}_{som_config.epochs}_epochs.som')
 
-        transformator = create_som_transformator(
-            data=som_config.data,
-            grid_dimension=gd,
-            endogen_variable=som_config.endogen_variable,
-            ignore=som_config.ignore,
-            epochs=som_config.epochs,
-            train_percentage=0.75,
-            filename=transformator_file
-        )
-        training_time = datetime.now()
-        head_message += f"\n{training_time} -- finish training -- {training_time - start_time} to train"
+    transformator = create_som_transformator(
+        data=som_config.data,
+        grid_dimension=grid,
+        endogen_variable=som_config.endogen_variable,
+        ignore=som_config.ignore,
+        epochs=som_config.epochs,
+        train_percentage=0.75,
+        filename=transformator_file,
+        learning_rate=learning_rate
+    )
+    training_time = datetime.now()
+    head_message += f"\n{training_time} -- finish training -- {training_time - start_time} to train"
 
-        reduction_file = project_path(f'data/som_reductions_validations/{prefix}reduction_{gd}_{som_config.epochs}_epochs.csv')
-        reduced_df = reduce_data_by_som(
-            df=som_config.data,
-            ignore=som_config.ignore,
-            som_transformator=transformator,
-            endogen_variable=som_config.endogen_variable,
-            reduction_file=reduction_file
-        )
+    reduction_file = project_path(f'data/som_reductions_validations/{prefix}reduction_{grid}_{som_config.epochs}_epochs{sufix}.csv')
+    reduced_data = reduce_data_by_som(
+        df=som_config.data,
+        ignore=som_config.ignore,
+        som_transformator=transformator,
+        endogen_variable=som_config.endogen_variable,
+        reduction_file=reduction_file
+    )
 
-        projection_time = datetime.now()
-        head_message += f"\n{projection_time} -- finish projection -- {projection_time - training_time} to project"
-
-        report_file = project_path(f'data/reports/{prefix}report_{gd}_{som_config.epochs}_epochs.txt')
-        with open(report_file, 'w') as rep:
-            rep.write(head_message)
-        head_message = ''
-        # print(reduced_df.head())
+    return reduced_data
 
 
 def create_and_train_models_with_train_test_split(
-        grids: List[int],
+        data: pd.DataFrame,
         som_config: SOMConfigurations,
         spliter: Callable,
         partitions: Tuple[int, int, int] = (50, 50, 50),
-        reductions_folder: str = project_path('data/som_reductions_validations'),
         models_folder: str = project_path('data/fts_models'),
-        prefix: str = ""
+        prefix: str = "",
 ) -> NoReturn:
-    for gd in grids:
-        head_message = "=" * 100
-        head_message += f"Params:\n\tGrid: {(gd, gd)}\n\tEpochs: {som_config.epochs}\n\tpartitions: {partitions}\n"
-        start_time = datetime.now()
-        head_message += f"\n{start_time} -- START"
 
-        print(head_message)
+    head_message = "=" * 100
+    start_time = datetime.now()
+    head_message += f"\n{start_time} -- START"
 
-        filename = f"{prefix}reduction_{gd}_{som_config.epochs}_epochs.csv"
-        data = pd.read_csv(f"{reductions_folder}/{filename}")
-        data[som_config.endogen_variable] = som_config.data[som_config.endogen_variable]
+    print(head_message)
 
-        x = Variable(
-            "x",
-            data_label="x",
-            partitioner=GridPartitioner,
-            npart=partitions[0],
-            data=data
-        )
+    x = Variable(
+        "x",
+        data_label="x",
+        partitioner=GridPartitioner,
+        npart=partitions[0],
+        data=data
+    )
 
-        y = Variable(
-            "y",
-            data_label="y",
-            partitioner=GridPartitioner,
-            npart=partitions[1],
-            data=data
-        )
+    y = Variable(
+        "y",
+        data_label="y",
+        partitioner=GridPartitioner,
+        npart=partitions[1],
+        data=data
+    )
 
-        z = Variable(
-            name=som_config.endogen_variable,
-            data_label=som_config.endogen_variable,
-            partitioner=GridPartitioner,
-            npart=partitions[2],
-            data=data
-        )
+    z = Variable(
+        name=som_config.endogen_variable,
+        data_label=som_config.endogen_variable,
+        partitioner=GridPartitioner,
+        npart=partitions[2],
+        data=data
+    )
 
-        model = WeightedMVFTS(
-            explanatory_variables=[x, y, z],
-            target_variable=z
-        )
+    model = WeightedMVFTS(
+        explanatory_variables=[x, y, z],
+        target_variable=z
+    )
 
-        # train_limit = ceil(len(data) * train_percentage)
+    # train_limit = ceil(len(data) * train_percentage)
 
-        train, test = spliter(data)
+    train, test = spliter(data)
 
-        print(f"Train length: {len(train)}")
-        print(f"Test length: {len(test)}\n")
+    print(f"Train length: {len(train)}")
+    print(f"Test length: {len(test)}\n")
 
-        model.fit(ndata=train, dump="time")
-        train_percentage = round(100 * len(train) / len(data))
-        filename = f"{prefix}_model_{gd}_train_with_{train_percentage}_percent_{partitions[0]}_partitions.model"
-        filepath = f"{models_folder}/{filename}"
+    model.fit(ndata=train, dump="time")
+    train_percentage = round(100 * len(train) / len(data))
+    filename = f"{prefix}_model_train_with_{train_percentage}_percent_{partitions[0]}_partitions.model"
+    filepath = f"{models_folder}/{filename}"
 
-        persist_obj(model, filepath)
+    persist_obj(model, filepath)
 
-        rmse, mape, u = Measures.get_point_statistics(
-            data=test,
-            model=model
-        )
+    rmse, mape, u = Measures.get_point_statistics(
+        data=test,
+        model=model
+    )
+    forecast = model.predict(test)
+    smape = Measures.smape(test[som_config.endogen_variable], forecast)
+    mae = mean_absolute_error(test[som_config.endogen_variable], forecast)
 
-        finish = datetime.now()
-        finish_message = f"\nFinish Training -- {finish - start_time} to train FTS model"
-        finish_message += f"\n\tRMSE: {rmse}\n\tMAPE: {mape}\n\tU: {u}"
+    finish = datetime.now()
+    finish_message = f"\nFinish Training -- {finish - start_time} to train FTS model"
+    finish_message += f"\n\tRMSE: {rmse}\n\tMAPE: {mape}\n\tU: {u}"
 
-        print(finish_message)
+    print(finish_message)
 
-        report_name = project_path(
-            f"data/reports/{prefix}_report_FTS_{gd}_SOM_with_{train_percentage}_percent_percent_{partitions[0]}_partitions.txt"
-        )
-        with open(report_name, 'w') as report:
-            report.write(head_message + finish_message)
+    data = {
+        partitions: {
+                "rmse": rmse,
+                "mape": mape,
+                "u": u,
+                "smape": smape,
+                "mae": mae,
+                "time to train FTS model": finish - start_time,
+                "rules": len(model),
+                "train percentage": train_percentage,
+                "FTS model file": filepath
+            }
+    }
+    return data
 
 
 if __name__=="__main__":
     # from sklearn.preprocessing import MinMaxScaler
 
+    # filename = project_path('data/HomeC/sanitized_homeCsub_amostrado.csv')
     filename = project_path('data/energydata_complete.csv')
+
+    # sub_sampled = filename[:-4] + "sub_amostrado.csv"
     data = pd.read_csv(filename)
-    data.pop('date')
+    # for col in data.columns[2:]:
+    #     data[col] = data[col].apply(lambda x: float('nan') if  x == "?" else float(x))
+    # data.dropna(inplace=True)
+    # data = data.iloc[lambda x: x.index%10 == 0]
+    # data.to_csv(sub_sampled, index=False)
 
-    som_config = SOMConfigurations(
-        data=data,
-        endogen_variable='Appliances',
-        epochs=20,
-        ignore=['date']
-    )
-    window = round(len(data) / 10)
-    step = round(len(data) / 20)
+    #
+    # data =
+    # data.pop('date')
+
+    n_windows = 30
+    tests_by_step = 5
+    window = round(len(data) / n_windows)
     last_step = 0
+    grids = [20]#, 100, 35, 20]
+    partitions = (40, 30, 20, 50, 10)
+    reduction_results = []
+    forecast_results = defaultdict(list)
+    forecast_result = defaultdict(list)
 
-    for current_step in range(20):
-        limit = last_step + window
-        som_config.data = data.iloc[last_step:limit]
-        for i in range(5):
-            pipeline(
-                grids=[25, 35, 50, 100],
-                som_config=som_config,
-                partitions=(20, 20, 20),
-                prefix=f"st{current_step}_exp{i}_"
-            )
-            print("=-="*50)
+    failures = []
+    epochs = 50
 
-            create_and_train_models_with_train_test_split(
-                grids=[25, 35, 50, 100],
-                som_config=som_config,
-                spliter=lambda x: (x[:round(len(x)*0.75)], x[round(len(x)*0.75):]),
-                partitions=(25, 25, 25),
-                prefix=f"st{current_step}_exp{i}_"
-            )
+    for epochs in [70, 80, 90, 100]:
+        for learning_rate in [0.1, 0.0001, 0.00001]:
+            for grid in grids:
+                data = pd.read_csv(filename)
+                for col in data.columns[2:]:
+                    data[col] = data[col].apply(lambda x: float('nan') if x == "?" else float(x))
+                data.dropna(inplace=True)
+                for ct, (_, train, test) in enumerate(sliding_window(data, window, 0.75, inc=1)):
+                    li = ct * window
+                    ls = (ct+1) * window
+                    DATASET = f"HOUSEHOLD_ep{epochs}_rate{learning_rate}"
+                    pd.DataFrame(reduction_results).to_csv(f"{DATASET}_reduction_results_grid{grid}.csv", index=False)
+                    for partitions, fr in forecast_results.items():
+                        pd.DataFrame(fr).to_csv(f'{DATASET}_forecast_results_grid{grid}_{partitions[0]}partitions.csv', index=False)
 
-        last_step += step
+                    home_c_ignore = ['time', 'icon', 'summary', 'cloudCover']
+                    home_c_endogen = 'use [kW]'
+
+                    householder_ignore = ['Date', 'Time']
+                    householder_endogen = 'Global_active_power'
+
+                    appliance_ignore = ['date']
+                    appliance_endogen = 'Appliances'
+
+                    som_config = SOMConfigurations(
+                        data=data.iloc[li:ls],
+                        endogen_variable=appliance_endogen,
+                        epochs=epochs,
+                        ignore=appliance_ignore
+                    )
+
+                    reduced_data = train_som_and_reduce_dataset_varying_grids(
+                        grid=grid,
+                        som_config=som_config,
+                        prefix=f"Household_",
+                        interval=(li, ls),
+                        sufix=f"_window_{ct}",
+                        learning_rate=learning_rate
+                    )
+
+                    print("=-=" * 50)
+                    forecast_result = {}
+                    for partition in [10,20,30,40,50]:
+                        forecast_result.update(
+                            create_and_train_models_with_train_test_split(
+                                data=reduced_data,
+                                som_config=som_config,
+                                spliter=lambda x: (x[:round(len(x)*0.75)], x[round(len(x)*0.75):]),
+                                partitions=(partition, partition, partition),
+                                prefix=f"Household_window_{ct}_",
+                            )
+                        )
+                    for fr in forecast_result:
+                        forecast_result[fr].update(
+                            {
+                                "partitions": fr,
+                                "interval": (li, ls),
+                                "grid": grid,
+                                "id": f"Household_report_{grid}_{som_config.epochs}_epochs_window_{ct}_{fr}_partitions"
+                            }
+                        )
+                        forecast_results[fr].append(forecast_result[fr])
+
