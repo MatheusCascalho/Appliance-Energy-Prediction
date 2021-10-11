@@ -15,6 +15,8 @@ import sys
 import traceback
 from collections import defaultdict
 from sklearn.metrics import mean_absolute_error
+from sklearn.preprocessing import MinMaxScaler
+
 
 
 
@@ -27,6 +29,8 @@ def reduce_data_by_som(
 ) -> pd.DataFrame:
     cols = [col for col in df.columns if col not in ignore]
     to_reduce = df[cols]
+    scaler = MinMaxScaler()
+    to_reduce = pd.DataFrame(scaler.fit_transform(to_reduce), columns=cols)
     reduced = som_transformator.apply(data=to_reduce, endogen_variable=endogen_variable)
     reduced.to_csv(reduction_file, index=False)
     return reduced
@@ -46,6 +50,8 @@ def create_som_transformator(
     som = SOMTransformation(grid_dimension=gd)
     cols = [col for col in data.columns if col != endogen_variable and col not in ignore]
     df = data[cols]
+    scaler = MinMaxScaler()
+    df = pd.DataFrame(scaler.fit_transform(df[cols].to_numpy()), columns=cols)
     som.train(data=df, epochs=epochs, percentage_train=train_percentage, leaning_rate=learning_rate)
     persist_obj(som, filename)
     print(f"\nSom transformator saved as {filename}\n")
@@ -191,6 +197,9 @@ if __name__=="__main__":
 
     # sub_sampled = filename[:-4] + "sub_amostrado.csv"
     data = pd.read_csv(filename)
+
+
+
     # for col in data.columns[2:]:
     #     data[col] = data[col].apply(lambda x: float('nan') if  x == "?" else float(x))
     # data.dropna(inplace=True)
@@ -224,7 +233,7 @@ if __name__=="__main__":
                 for ct, (_, train, test) in enumerate(sliding_window(data, window, 0.75, inc=1)):
                     li = ct * window
                     ls = (ct+1) * window
-                    DATASET = f"HOUSEHOLD_ep{epochs}_rate{learning_rate}"
+                    DATASET = f"APPLIANCE_ep{epochs}_rate{learning_rate}"
                     pd.DataFrame(reduction_results).to_csv(f"{DATASET}_reduction_results_grid{grid}.csv", index=False)
                     for partitions, fr in forecast_results.items():
                         pd.DataFrame(fr).to_csv(f'{DATASET}_forecast_results_grid{grid}_{partitions[0]}partitions.csv', index=False)
