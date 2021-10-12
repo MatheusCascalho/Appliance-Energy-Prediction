@@ -27,10 +27,11 @@ def reduce_data_by_som(
         endogen_variable: str,
         reduction_file: str
 ) -> pd.DataFrame:
-    cols = [col for col in df.columns if col not in ignore]
+    cols = [col for col in df.columns if col not in ignore and col != endogen_variable]
     to_reduce = df[cols]
     scaler = MinMaxScaler()
     to_reduce = pd.DataFrame(scaler.fit_transform(to_reduce), columns=cols)
+    to_reduce[endogen_variable] = df[endogen_variable].values
     reduced = som_transformator.apply(data=to_reduce, endogen_variable=endogen_variable)
     reduced.to_csv(reduction_file, index=False)
     return reduced
