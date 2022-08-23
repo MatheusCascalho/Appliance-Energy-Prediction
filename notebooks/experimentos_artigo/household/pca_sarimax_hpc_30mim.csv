@@ -1,0 +1,2 @@
+rmse,mae,mape,smape,nrmse,rmse_std,mae_std,mape_std,smape_std,nrmse_std
+0.901,0.517,64.932,22.99,0.154,0.211,0.125,14.072,4.179,0.026
